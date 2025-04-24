@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="unitedFlightsFlow" doc:id="1c7b5fab-1e41-484b-aff2-b76edafcfb5a" >
+		<http:listener doc:name="GET /flights" doc:id="ef2c51e3-5d15-42b2-b0bd-ea365a3a6ae0" config-ref="mua-flights-api-httpListenerConfig" path="/united"/>
+		<http:request method="GET" doc:name="United" doc:id="786d6aa3-da21-410a-aa42-2bc59cd35cb6" url="http://ilt.mule-training.com/united/flights/{AC}">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"AC" : attributes.queryParams.code
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="21ba26a5-300c-4811-bdc1-ed964b59bca4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
