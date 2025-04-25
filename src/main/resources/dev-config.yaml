@@ -1,2 +1,6 @@
 http:
   port: "8081"
+  
+american:
+  client-id: ${CLIENT_ID}
+  client-secret: ${CLIENT_SECRET}
