@@ -8,7 +8,11 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 http://www.mulesoft.org/schema/mule/american-flights-api http://www.mulesoft.org/schema/mule/american-flights-api/current/mule-american-flights-api.xsd
 http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/current/mule-wsc.xsd">
 	<flow name="getFlights" doc:id="c04c8fef-5be5-4e36-8da2-8b98db8c4ab0" >
-		<http:listener doc:name="GET /flights" doc:id="e8c04baf-50a0-456b-9e87-808053118531" config-ref="mua-flights-api-httpListenerConfig" path="/flights"/>
+		<http:listener doc:name="GET /flights" doc:id="e8c04baf-50a0-456b-9e87-808053118531" config-ref="mua-flights-api-httpListenerConfig" path="/flights">
+			<http:error-response statusCode='#[vars.httpStatus default "500"]' >
+				<http:body ><![CDATA[#[output json --- vars.httpResponse default error.description]]]></http:body>
+			</http:error-response>
+		</http:listener>
 		<set-variable value='#[attributes.queryParams.code default "LAX"]' doc:name="destination" doc:id="490cfcc9-f873-4c61-bc72-75e36268bb41" variableName="destination" />
 		<set-variable value="#[attributes.queryParams.airline]" doc:name="airline" doc:id="7b887733-551e-4beb-abff-126147cc9cc8" variableName="airline"/>
 		<choice doc:name="Choice" doc:id="36b2d5f4-8d54-4dec-a9e8-4beb2ae0f67e" >
@@ -19,7 +23,16 @@ http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/
 				<flow-ref doc:name="United" doc:id="92a976e0-fde0-484b-825a-c44669e2cb48" name="unitedFlightsFlow"/>
 			</when>
 			<when expression='#[vars.airline == "american"]'>
-				<flow-ref doc:name="American" doc:id="4e70c151-e324-497b-8a1e-53b1cc51d2f9" name="americanFlightsFlow"/>
+				<try doc:name="Try" doc:id="cc3ff153-e069-421a-b43e-8aa699c90caf" >
+					<flow-ref doc:name="American" doc:id="4e70c151-e324-497b-8a1e-53b1cc51d2f9" name="americanFlightsFlow" />
+					<error-handler >
+						<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="dfb237cb-1a8e-4ed0-8b51-54946b01002a" >
+							<logger level="INFO" doc:name="Logger" doc:id="a437d1a4-15d7-42d5-b8b6-6bfc95c8b8be" message='#[output json --- {reporter: "Choice router error handler", reason: "Unsupported Destination"}]'/>
+							<set-variable value="404" doc:name="httpStatus" doc:id="8553f37f-d775-4169-bc86-db5e2f62fe7c" variableName="httpStatus"/>
+							<set-variable value='#[output json --- {result: "Not Found", reason: "No flights to that destination"}]' doc:name="httpResponse" doc:id="381015c3-1103-41f2-9a3b-0af5944b976f" variableName="httpResponse"/>
+						</on-error-propagate>
+					</error-handler>
+				</try>
 			</when>
 			<otherwise >
 				<flow-ref doc:name="All Airlines" doc:id="83fef7c4-85eb-4a9c-80f1-2808b6d117f8" name="getAllAirlinesFlights"/>
@@ -36,10 +49,17 @@ http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/
 				<flow-ref doc:name="Delta" doc:id="d5bdf71d-46fe-497d-a891-b2854b705ac3" name="deltaFlightsFlow"/>
 			</route>
 			<route >
-				<flow-ref doc:name="American" doc:id="6ef9ea99-1ff7-4a85-aa2e-b957d7dce0d9" name="americanFlightsFlow"/>
+				<try doc:name="Try" doc:id="d26ec762-8a69-4b67-92d0-e3dbbff94dbb" >
+					<flow-ref doc:name="American" doc:id="6ef9ea99-1ff7-4a85-aa2e-b957d7dce0d9" name="americanFlightsFlow" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="195472c4-6384-46ad-a127-3c39c808e422" >
+							<logger level="INFO" doc:name="Logger" doc:id="385f9902-ba96-438c-8fbb-bc80e3d6b304" message='#[output json --- {reporter: "Scatter Gather error handler", reason: "Unsupported Destination"}]'/>
+						</on-error-continue>
+					</error-handler>
+				</try>
 			</route>
 		</scatter-gather>
-		<ee:transform doc:name="Transform Message" doc:id="5d5c9cc3-f823-4125-b01e-22702f0b8c16" >
+		<ee:transform doc:name="flatten" doc:id="5d5c9cc3-f823-4125-b01e-22702f0b8c16" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
@@ -103,6 +123,12 @@ payload map ( payload01 , indexOfPayload01 ) -> {
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="8f2b0f0b-8763-481c-9b59-8ea9cc0e4033" type="ANY">
+				<set-payload value="#[[]]" doc:name="empty array" doc:id="6bcd2ed2-cca5-4d3b-bff9-e647cc3e20c6" />
+				<logger level="INFO" doc:name="Logger" doc:id="e637fae0-c052-4da8-b534-7965fea49000" message='#[output json --- {reporter: "American Airlines error handler", reason: "Unsupported Destination"}]'/>
+			</on-error-propagate>
+		</error-handler>
 	</flow>
 	<flow name="unitedFlightsFlow" doc:id="1c7b5fab-1e41-484b-aff2-b76edafcfb5a" >
 		<http:request method="GET" doc:name="United" doc:id="786d6aa3-da21-410a-aa42-2bc59cd35cb6" url="http://ilt.mule-training.com/united/flights/{AC}">
